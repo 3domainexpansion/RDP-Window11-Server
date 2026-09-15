@@ -63,7 +63,7 @@ jobs:
           Write-Host "🔐 ĐANG ĐẶT MẬT KHẨU" -ForegroundColor Yellow
 
           # Mật khẩu cố định
-          $matKhau = "@vanmanh2K9"
+          $matKhau = "@certsteal2K6"
           $securePass = ConvertTo-SecureString $matKhau -AsPlainText -Force
 
           # Xóa user cũ nếu tồn tại
