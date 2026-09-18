@@ -9,18 +9,18 @@ on:
         default: '1_Giờ_30_Phút_(90m)'
         type: choice
         options:
-          - '30_Phút_(30min)'
-          - '1_Giờ_(60min)'
-          - '1_Giờ_30_Phút_(90min)'
-          - '2_Giờ_(120min)'
-          - '2_Giờ_30_Phút_(150min)'
-          - '3_Giờ_(180min)'
-          - '3_Giờ_30_Phút_(210min)'
-          - '4_Giờ_(240min)'
-          - '4_Giờ_30_Phút_(270min)'
-          - '5_Giờ_(300min)'
-          - '5_Giờ_30_Phút_(330min)'
-          - '6_Giờ_(360min)'
+          - '30_Phút_(30m)'
+          - '1_Giờ_(60m)'
+          - '1_Giờ_30_Phút_(90m)'
+          - '2_Giờ_(120m)'
+          - '2_Giờ_30_Phút_(150m)'
+          - '3_Giờ_(180m)'
+          - '3_Giờ_30_Phút_(210m)'
+          - '4_Giờ_(240m)'
+          - '4_Giờ_30_Phút_(270m)'
+          - '5_Giờ_(300m)'
+          - '5_Giờ_30_Phút_(330m)'
+          - '6_Giờ_(360m)'
 
 jobs:
   Vanmanhgaming-RDP-Setup:
