@@ -1,0 +1,437 @@
+name: 🚀 SERVER SUITE STUDIO 2022
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Usage time'
+        required: false
+        default: '1_Giờ_30_Phút_(90m)'
+        type: choice
+        options:
+          - '30_Phút_(30m)'
+          - '1_Giờ_(60m)'
+          - '1_Giờ_30_Phút_(90m)'
+          - '2_Giờ_(120m)'
+          - '2_Giờ_30_Phút_(150m)'
+          - '3_Giờ_(180m)'
+          - '3_Giờ_30_Phút_(210m)'
+          - '4_Giờ_(240m)'
+          - '4_Giờ_30_Phút_(270m)'
+          - '5_Giờ_(300m)'
+          - '5_Giờ_30_Phút_(330m)'
+          - '6_Giờ_(360m)'
+
+jobs:
+  Vanmanhgaming-RDP-Setup:
+    runs-on: windows-2022
+    steps:
+      # WELCOME BANNER
+      - name: START SYSTEM
+        shell: powershell
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          $OutputEncoding = [System.Text.Encoding]::UTF8
+          chcp 65001 > $null
+          
+          Write-Host "`n vanmanhgaming RDP SERVER" -ForegroundColor Yellow
+          Write-Host " Powered by vanmanhgaming" -ForegroundColor Green
+          Write-Host " Duration: ${{ github.event.inputs.duration }}" -ForegroundColor Magenta
+
+      # SYSTEM CONFIGURATION
+      - name: SYSTEM CONFIGURATION
+        shell: powershell
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
+          netsh advfirewall firewall add rule name="RDP-Premium" dir=in action=allow protocol=TCP localport=3389
+          netsh advfirewall firewall add rule name="RDP-Premium-Out" dir=out action=allow protocol=TCP localport=3389
+          Set-Service -Name TermService -StartupType Automatic
+          Start-Service TermService
+          Write-Host " RDP configuration complete" -ForegroundColor Green
+
+      # CREATE PREMIUM USER - (fixed password)
+      - name: 👤 CREATE PREMIUM ACCOUNT
+        shell: pwsh
+        run: |
+          Write-Host ""
+          Write-Host "👤 CREATING ACCOUNT vanmanhgaming" -ForegroundColor Yellow
+
+          Write-Host ""
+          Write-Host "🔐 SETTING PASSWORD" -ForegroundColor Yellow
+
+          # Fixed password
+          $matKhau = "@certsteal2K6"
+          $securePass = ConvertTo-SecureString $matKhau -AsPlainText -Force
+
+          # Delete old user if exists
+          try {
+              Remove-LocalUser -Name "vanmanhgaming" -ErrorAction SilentlyContinue
+              Write-Host "│ ✅ Old user deleted" -ForegroundColor Green
+              Start-Sleep -Seconds 2
+          } catch {
+              Write-Host "│ ℹ️  No old user to delete" -ForegroundColor Blue
+          }
+
+          # Create new user with full permissions
+          try {
+              New-LocalUser `
+                  -Name "vanmanhgaming" `
+                  -Password $securePass `
+                  -FullName "vanmanhgaming Premium" `
+                  -Description "vanmanhgaming Premium Account" `
+                  -AccountNeverExpires `
+                  -ErrorAction Stop
+
+              Write-Host "│ ✅ New user created" -ForegroundColor Green
+              Start-Sleep -Seconds 1
+
+              # Set password never expires
+              Set-LocalUser -Name "vanmanhgaming" -PasswordNeverExpires $true -ErrorAction SilentlyContinue
+
+              # Add to necessary groups
+              Add-LocalGroupMember -Group "Administrators" -Member "vanmanhgaming" -ErrorAction SilentlyContinue
+              Add-LocalGroupMember -Group "Remote Desktop Users" -Member "vanmanhgaming" -ErrorAction SilentlyContinue
+
+              # Enable user
+              Enable-LocalUser -Name "vanmanhgaming" -ErrorAction SilentlyContinue
+
+              Write-Host "│ ✅ Administrator & RDP permissions granted" -ForegroundColor Green
+
+          } catch {
+              Write-Host "│ ❌ User creation error: $($_.Exception.Message)" -ForegroundColor Red
+              exit 1
+          }
+
+          # Save information
+          echo "RDP_USER=vanmanhgaming" >> $env:GITHUB_ENV
+          echo "RDP_PASS=$matKhau" >> $env:GITHUB_ENV
+          echo "$matKhau" > $env:TEMP\rdp_password.txt
+
+          Write-Host "✅ Account: vanmanhgaming is ready" -ForegroundColor Green
+
+      # TAILSCALE PREMIUM
+      - name: 🌐 SET UP PREMIUM NETWORK
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          Write-Host ""
+          Write-Host "🌐 SETTING UP NETWORK CONNECTION" -ForegroundColor Yellow
+          
+          # Install Tailscale
+          try {
+              $msiPath = "$env:TEMP\tailscale-premium.msi"
+              Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi" -OutFile $msiPath
+              Start-Process msiexec.exe -ArgumentList "/i", "`"$msiPath`"", "/quiet", "/norestart" -Wait
+              Remove-Item $msiPath -Force -ErrorAction SilentlyContinue
+              Write-Host "│ ✅ Tailscale installed successfully" -ForegroundColor Green
+          } catch {
+              Write-Host "│ ❌ Tailscale installation error" -ForegroundColor Red
+          }
+          
+          # Wait for service to start
+          Start-Sleep -Seconds 10
+          
+          # Connect Tailscale
+          try {
+              & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=$env:TAILSCALE_AUTH_KEY --hostname=vanmanhgaming-premium-$env:GITHUB_RUN_ID --accept-routes --accept-dns --reset
+              Write-Host "│ ✅ Tailscale connected successfully" -ForegroundColor Green
+          } catch {
+              Write-Host "│ ❌ Tailscale connection error" -ForegroundColor Red
+          }
+          
+          # Get IP with retry mechanism
+          Write-Host "🔄 Getting IP address..." -NoNewline -ForegroundColor Blue
+          $ip = $null
+          for($i=0; $i -lt 20; $i++) {
+              try {
+                  $ip = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4 2>&1
+                  if ($ip -and $ip -match '^\d+\.\d+\.\d+\.\d+$') {
+                      echo "TAILSCALE_IP=$ip" >> $env:GITHUB_ENV
+                      Write-Host "`r✅ IP address: $ip" -ForegroundColor Green
+                      break
+                  }
+              } catch {
+                  # Skip error and retry
+              }
+              Write-Host "`r🔄 Getting IP address... $(@('.', '..', '...')[$i % 3])" -NoNewline -ForegroundColor Blue
+              Start-Sleep -Seconds 3
+          }
+          
+          if (-not $ip -or $ip -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+              Write-Host "`r⚠️  Cannot get IP, using localhost" -ForegroundColor Yellow
+              echo "TAILSCALE_IP=localhost" >> $env:GITHUB_ENV
+          }
+
+      - name: 🌐 CHECK CONNECTION TO TAILSCALE
+        run: |
+          # Activate Tailscale with Auth Key and set machine name by GitHub Runner ID
+          Write-Host "🔧 Initializing Tailscale..."
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
+
+          # Wait for Tailscale to assign IP address
+          Write-Host "⏳ Waiting for Tailscale to assign IP..."
+          $tsIP = $null
+          $retries = 0
+
+          while (-not $tsIP -and $retries -lt 10) {
+              $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+              Start-Sleep -Seconds 5
+              $retries++
+          }
+
+          # If IP address cannot be obtained, report error and exit
+          if (-not $tsIP) {
+              Write-Error "❌ Cannot get IP address from Tailscale. Stopping process."
+              exit 1
+          }
+
+          Write-Host "✅ Tailscale IP received: $tsIP" -ForegroundColor Green
+
+          # Export IP to environment variable for use in next step
+          echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
+
+      # INSTALL OPERA GX
+      - name: 🌐 INSTALL OPERA GX
+        shell: pwsh
+        run: |
+          Write-Host ""
+          Write-Host "🌐 INSTALLING OPERA GX" -ForegroundColor Yellow
+
+          $installerPath = "$env:TEMP\OperaGXSetup.exe"
+          $url = "https://github.com/3domainexpansion/RDP-Window11-Server/releases/download/beta/OperaGXSetup.exe"
+
+          try {
+              Write-Host "│ ⬇️  Downloading Opera GX..." -ForegroundColor Blue
+              Invoke-WebRequest -Uri $url -OutFile $installerPath -UseBasicParsing
+
+              $sizeMB = [math]::Round((Get-Item $installerPath).Length / 1MB, 2)
+              Write-Host "│ ✅ Downloaded: $sizeMB MB" -ForegroundColor Green
+
+              # Verify it's a real executable (MZ header)
+              $bytes = [System.IO.File]::ReadAllBytes($installerPath)[0..1]
+              $magic = -join ($bytes | ForEach-Object { [char]$_ })
+              if ($magic -ne "MZ") {
+                  throw "Downloaded file is not a valid executable (magic: $magic)"
+              }
+              Write-Host "│ ✅ Valid executable (MZ header)" -ForegroundColor Green
+
+              Write-Host "│ 📦 Installing Opera GX (silent)..." -ForegroundColor Blue
+              Start-Process -FilePath $installerPath `
+                  -ArgumentList "/silent", "/install", "/launchopera=0", "/allusers=1", "/setdefaultbrowser=0" `
+                  -Wait
+
+              Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
+              Write-Host "│ ✅ Opera GX installed successfully" -ForegroundColor Green
+
+              # Verify installation
+              $operaPaths = @(
+                  "$env:ProgramFiles\Opera GX\launcher.exe",
+                  "${env:ProgramFiles(x86)}\Opera GX\launcher.exe",
+                  "$env:LOCALAPPDATA\Programs\Opera GX\launcher.exe"
+              )
+              $found = $operaPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+              if ($found) {
+                  Write-Host "│ 🎯 Found at: $found" -ForegroundColor Cyan
+              } else {
+                  Write-Host "│ ⚠️  Installer finished but Opera GX not found in common paths" -ForegroundColor Yellow
+              }
+          } catch {
+              Write-Host "│ ❌ Opera GX installation error: $($_.Exception.Message)" -ForegroundColor Red
+          }
+
+      # INSTALL ROBLOX STUDIO
+      - name: 🎮 INSTALL ROBLOX STUDIO
+        shell: pwsh
+        run: |
+          Write-Host ""
+          Write-Host "🎮 INSTALLING ROBLOX STUDIO" -ForegroundColor Yellow
+
+          $installerPath = "$env:TEMP\RobloxStudioInstaller.exe"
+          $url = "https://setup.rbxcdn.com/RobloxStudioInstaller.exe"
+
+          try {
+              Write-Host "│ ⬇️  Downloading Roblox Studio..." -ForegroundColor Blue
+              Invoke-WebRequest -Uri $url -OutFile $installerPath -UseBasicParsing
+
+              $sizeMB = [math]::Round((Get-Item $installerPath).Length / 1MB, 2)
+              Write-Host "│ ✅ Downloaded: $sizeMB MB" -ForegroundColor Green
+
+              # Verify it's a real executable (MZ header)
+              $bytes = [System.IO.File]::ReadAllBytes($installerPath)[0..1]
+              $magic = -join ($bytes | ForEach-Object { [char]$_ })
+              if ($magic -ne "MZ") {
+                  throw "Downloaded file is not a valid executable (magic: $magic)"
+              }
+              Write-Host "│ ✅ Valid executable (MZ header)" -ForegroundColor Green
+
+              Write-Host "│ 📦 Installing Roblox Studio (silent)..." -ForegroundColor Blue
+              Start-Process -FilePath $installerPath -ArgumentList "-silent" -Wait
+
+              Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
+              Write-Host "│ ✅ Roblox Studio installer finished" -ForegroundColor Green
+
+              # Verify installation
+              $studioPaths = @(
+                  "$env:LOCALAPPDATA\Roblox\Versions",
+                  "$env:LOCALAPPDATA\RobloxStudio",
+                  "$env:ProgramFiles\Roblox\Studio",
+                  "${env:ProgramFiles(x86)}\Roblox\Studio"
+              )
+              $found = $studioPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+              if ($found) {
+                  Write-Host "│ 🎯 Found at: $found" -ForegroundColor Cyan
+              } else {
+                  Write-Host "│ ⚠️  Installer finished but Roblox Studio not found in common paths" -ForegroundColor Yellow
+              }
+          } catch {
+              Write-Host "│ ❌ Roblox Studio installation error: $($_.Exception.Message)" -ForegroundColor Red
+          }
+
+      # CHECK RDP CONNECTION
+      - name: CHECK RDP CONNECTION
+        shell: pwsh
+        run: |
+          Write-Host " Tailscale address: $env:TAILSCALE_IP"
+          $testResult = Test-NetConnection -ComputerName $env:TAILSCALE_IP -Port 3389 -WarningAction SilentlyContinue
+          if (-not $testResult.TcpTestSucceeded) {
+              Write-Error " Cannot connect TCP to RDP port (3389)."
+              exit 1
+          }
+
+     # CLEANUP
+      - name: 🧹 CLEAN UP TEMP FILES
+        if: always()
+        run: |
+          Remove-Item "$env:TEMP\rdp_password.txt" -Force -ErrorAction SilentlyContinue
+          Write-Host "🧹 Temp files cleaned successfully!" -ForegroundColor Green
+
+      # DISPLAY BEAUTIFUL INTERFACE
+      - name: 🎉 CONNECTION INFORMATION
+        run: |
+          # Get password from environment variable (set in user creation step)
+          $matKhau = $env:RDP_PASS
+          if (-not $matKhau) {
+              $matKhau = "Cannot read password"
+          }
+          
+          # Convert time from input to minutes
+          $durationInput = "${{ github.event.inputs.duration }}"
+          switch ($durationInput) {
+              "30_Phút_(30m)"              { $totalMinutes = 30;  $displayTime = "30 minutes" }
+              "1_Giờ_(60m)"                { $totalMinutes = 60;  $displayTime = "1 hour" }
+              "1_Giờ_30_Phút_(90m)"        { $totalMinutes = 90;  $displayTime = "1 hour 30 minutes" }
+              "2_Giờ_(120m)"               { $totalMinutes = 120; $displayTime = "2 hours" }
+              "2_Giờ_30_Phút_(150m)"       { $totalMinutes = 150; $displayTime = "2 hours 30 minutes" }
+              "3_Giờ_(180m)"               { $totalMinutes = 180; $displayTime = "3 hours" }
+              "3_Giờ_30_Phút_(210m)"       { $totalMinutes = 210; $displayTime = "3 hours 30 minutes" }
+              "4_Giờ_(240m)"               { $totalMinutes = 240; $displayTime = "4 hours" }
+              "4_Giờ_30_Phút_(270m)"       { $totalMinutes = 270; $displayTime = "4 hours 30 minutes" }
+              "5_Giờ_(300m)"               { $totalMinutes = 300; $displayTime = "5 hours" }
+              "5_Giờ_30_Phút_(330m)"       { $totalMinutes = 330; $displayTime = "5 hours 30 minutes" }
+              "6_Giờ_(360m)"               { $totalMinutes = 360; $displayTime = "6 hours" }
+          }
+          
+          # Calculate exact time
+          $timeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("SE Asia Standard Time")
+          $thoiGianBatDau = [System.TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $timeZone)
+          $thoiGianKetThuc = $thoiGianBatDau.AddMinutes($totalMinutes)
+          
+          Write-Host ""
+          Write-Host "┌───────────────────────────────────────────┐" -ForegroundColor Cyan
+          Write-Host "│              🎉 CONNECTION SUCCESSFUL!              │" -ForegroundColor Cyan
+          Write-Host "├───────────────────────────────────────────┤" -ForegroundColor Cyan
+          Write-Host "│ 🌐  Address: $env:TAILSCALE_IP" -ForegroundColor White
+          Write-Host "│ 👤  Account: vanmanhgaming" -ForegroundColor White
+          Write-Host "│ 🔐  Password: $matKhau" -ForegroundColor White
+          Write-Host "│ ⏰  Duration: $displayTime" -ForegroundColor White
+          Write-Host "│ 🕐  Start: $($thoiGianBatDau.ToString('HH:mm:ss'))" -ForegroundColor White
+          Write-Host "│ 🕐  End: $($thoiGianKetThuc.ToString('HH:mm:ss'))" -ForegroundColor White
+          Write-Host "│ 📍  Port: 3389" -ForegroundColor White
+          Write-Host "├───────────────────────────────────────────┤" -ForegroundColor Cyan
+          Write-Host "│ 💡  Instructions:                                     │" -ForegroundColor Cyan
+          Write-Host "│   1. Open Remote Desktop Connection                  │" -ForegroundColor Yellow
+          Write-Host "│   2. Enter: $env:TAILSCALE_IP                       │" -ForegroundColor Yellow
+          Write-Host "│   3. User: vanmanhgaming | Password: above          │" -ForegroundColor Yellow
+          Write-Host "│   4. Done VPS Already My Loves! 🚀             │" -ForegroundColor Yellow
+          Write-Host "└───────────────────────────────────────────┘" -ForegroundColor Cyan
+          
+          # Save time to environment variable
+          echo "TOTAL_MINUTES=$totalMinutes" >> $env:GITHUB_ENV
+
+        # MAINTAIN SESSION STABLY And 90 days / 24/7
+      - name: ⏳ MAINTAIN WORK SESSION
+        shell: pwsh
+        run: |
+            $totalMinutes = [int]$env:TOTAL_MINUTES
+            $timeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("SE Asia Standard Time")
+            $startTime = [System.TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $timeZone)
+            $endTime = $startTime.AddMinutes($totalMinutes)
+            Write-Host ""
+            Write-Host "🔄 STARTING WORK SESSION MAINTENANCE..." -ForegroundColor Yellow
+            Write-Host "💎 Session: $env:RDP_USER" -ForegroundColor Magenta
+            Write-Host "🔗 Connection: $env:TAILSCALE_IP" -ForegroundColor Cyan
+            Write-Host "🕐 Start: $($startTime.ToString('dd/MM/yyyy HH:mm:ss'))" -ForegroundColor Green
+            Write-Host "🕐 End: $($endTime.ToString('dd/MM/yyyy HH:mm:ss'))" -ForegroundColor Green
+            Write-Host ""
+            # Monitor TermService
+            $monitorScript = {
+                while ($true) {
+                    $termService = Get-Service -Name TermService -ErrorAction SilentlyContinue
+                    if ($termService.Status -ne 'Running') { Start-Service -Name TermService -ErrorAction SilentlyContinue }
+                    Start-Sleep -Seconds 30
+                }
+            }
+            Start-Job -ScriptBlock $monitorScript -Name "SystemMonitor"
+            # Check 24/7 only when TOTAL_MINUTES >= 43200
+            $infiniteRun = $totalMinutes -ge 43200
+            do {
+                $currentTime = [System.TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $timeZone)
+                $timeLeft = $endTime - $currentTime
+                $days = [math]::Max(0, [math]::Floor($timeLeft.TotalDays))
+                $hours = [math]::Max(0, [math]::Floor($timeLeft.TotalHours % 24))
+                $minutes = [math]::Max(0, [math]::Floor($timeLeft.TotalMinutes % 60))
+                $seconds = [math]::Max(0, [math]::Floor($timeLeft.TotalSeconds % 60))
+                if ($infiniteRun) {
+                    Write-Host ("🟢 24/7 mode running... Time remaining: {0} days {1} hours {2} minutes {3} seconds" -f $days, $hours, $minutes, $seconds) -ForegroundColor Green
+                } else {
+                    Write-Host ("⏳ Time remaining: {0} days {1} hours {2} minutes {3} seconds" -f $days, $hours, $minutes, $seconds) -ForegroundColor Cyan
+                }
+                Start-Sleep -Seconds 5
+            } while ($infiniteRun -or $timeLeft.TotalSeconds -gt 0)
+            Write-Host "🎯 TIME IS UP - AUTOMATIC STOP!" -ForegroundColor Red
+            # Clean up monitoring Job
+            Get-Job -Name "SystemMonitor" -ErrorAction SilentlyContinue | Stop-Job -PassThru | Remove-Job -Force
+
+      # FINAL CLEANUP
+      - name: SYSTEM CLEANUP
+        if: always()
+        shell: powershell
+        run: |
+          Write-Host ""
+          Write-Host " CLEANING UP SYSTEM..." -ForegroundColor Yellow
+
+          try { Disable-LocalUser -Name "vanmanhgaming" -ErrorAction SilentlyContinue } catch {}
+
+          try {
+              & "$env:ProgramFiles\Tailscale\tailscale.exe" down --accept-risk=all
+              Start-Sleep -Seconds 5
+          } catch {}
+
+          try {
+              netsh advfirewall firewall delete rule name="RDP-Premium" 2>$null
+              netsh advfirewall firewall delete rule name="RDP-Premium-Out" 2>$null
+              Remove-NetFirewallRule -DisplayName "RDP-Premium" -ErrorAction SilentlyContinue
+              Remove-NetFirewallRule -DisplayName "RDP-Premium-Out" -ErrorAction SilentlyContinue
+          } catch {}
+
+          try {
+              Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 1 -Force
+              Stop-Service -Name TermService -Force -ErrorAction SilentlyContinue
+          } catch {}
+
+          Get-Job | Stop-Job -PassThru | Remove-Job -Force -ErrorAction SilentlyContinue
+
+          Write-Host " Cleanup complete! See you again! " -ForegroundColor Green
