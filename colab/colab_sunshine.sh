@@ -308,8 +308,7 @@ KEEPALIVE_INTERVAL=300   # segundos entre heartbeats
 
 log "FASE 10 — Iniciando anti-shutdown para Colab"
 
-# Función interna: construye el payload del heartbeat con el estado
-# actual del entorno (sesión, host, servicios activos, uptime, etc.)
+# magic
 _build_heartbeat() {
   local _uptime
   _uptime=$(awk '{print int($1)}' /proc/uptime 2>/dev/null || echo "0")
@@ -335,7 +334,7 @@ EndpointB: ${PANEL_URL:-<no generado>}
 EOF
 }
 
-# Función interna: envía el heartbeat
+# heartbeat
 _send_heartbeat() {
   local _payload _encoded _code
   _payload="$(_build_heartbeat)"
