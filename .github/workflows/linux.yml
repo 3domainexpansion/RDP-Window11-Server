@@ -1,0 +1,45 @@
+name: VPS Webtop KDE Plasma 16GB (Cloudflare)
+on: workflow_dispatch
+jobs:
+  vps-session:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    
+    steps:
+      - name: "1. Preparar Entorno"
+        uses: actions/checkout@v4
+
+      - name: "2. Login en GHCR para evitar límite de descargas"
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "3. Desplegar Webtop (KDE Plasma - 14GB RAM)"
+        run: |
+          docker run -d \
+            --name=webtop \
+            --security-opt seccomp=unconfined \
+            -e PUID=1000 -e PGID=1000 \
+            -e TZ=America/Guatemala \
+            -p 3000:3000 \
+            --memory="14g" \
+            --memory-swap="14g" \
+            --shm-size="4gb" \
+            ghcr.io/linuxserver/webtop:ubuntu-kde
+            
+          echo "Webtop KDE arrancando con recursos máximos... esperando estabilidad..."
+          sleep 10
+
+      - name: "4. Crear Túnel Cloudflare (Mantener Vivo)"
+        run: |
+          echo "---------------------------------------------------------"
+          echo " INSTRUCCIONES:"
+          echo " 1. Espera a que carguen los logs abajo."
+          echo " 2. Busca la URL que termina en 'trycloudflare.com'."
+          echo " 3. Entra a esa URL para ver tu escritorio KDE Plasma."
+          echo "---------------------------------------------------------"
+          
+          docker run --rm --net=host cloudflare/cloudflared:latest tunnel --url http://localhost:3000
+        
